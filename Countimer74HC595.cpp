@@ -27,34 +27,7 @@ Countimer74HC595::Countimer74HC595(int numberOfShiftRegisters, int serialDataPin
     
     // allocates the specified number of bytes and initializes them to zero
     _digitalValues = (uint8_t *)calloc(numberOfShiftRegisters, sizeof(uint8_t));
-    
-	//byte dec_digits[] = {0b11000000,0b11111001,0b10100100,0b10110000,0b10011001,0b10010010,0b10000011,0b11111000,0b10000000,0b10011000 };
-	
-	// numbers without dot
-	_dec_digits[0] = 0b11000000;
-	_dec_digits[1] = 0b11111001;
-	_dec_digits[2] = 0b10100100;
-	_dec_digits[3] = 0b10110000;
-	_dec_digits[4] = 0b10011001;
-	_dec_digits[5] = 0b10010010;
-	_dec_digits[6] = 0b10000011;
-	_dec_digits[7] = 0b11111000;
-	_dec_digits[8] = 0b10000000;
-	_dec_digits[9] = 0b10011000;
-	
-	// numbers with dot
-	_dec_digits[10] = 0b01000000;
-	_dec_digits[11] = 0b01111001;
-	_dec_digits[12] = 0b00100100;
-	_dec_digits[13] = 0b00110000;
-	_dec_digits[14] = 0b00011001;
-	_dec_digits[15] = 0b00010010;
-	_dec_digits[16] = 0b00000011;
-	_dec_digits[17] = 0b01111000;
-	_dec_digits[18] = 0b00000000;
-	_dec_digits[19] = 0b00011000;
-	
-	
+
 	_previousMillis = 0;
 	_currentCountTime = 0;
 	_countTime = 0;
@@ -70,7 +43,9 @@ void Countimer74HC595::setCounter(uint8_t hours, uint8_t minutes, uint8_t second
 {
 	_onComplete = onComplete;
 	_countType = countType;
-	_interval = interval;	
+	_interval = interval;
+	
+	//_formatted_time = formatted_time;
 		
 	_countTime = (((hours * 3600) + (minutes * 60) + seconds) * 1000 );
 		
@@ -78,10 +53,10 @@ void Countimer74HC595::setCounter(uint8_t hours, uint8_t minutes, uint8_t second
 		case COUNT_UP:
 			_currentCountTime = 0;
 			break;
-		case COUNT_DOWN;
+		case COUNT_DOWN:
 			_currentCountTime = _countTime;
 			break;
-		default;
+		default:
 			break;
 	}
 		
@@ -92,53 +67,158 @@ void Countimer74HC595::setCounter(uint8_t hours, uint8_t minutes, uint8_t second
 void Countimer74HC595::run()
 {
 	// timer is running only if is not completed or not stopped.
-	if (_isCounterCompleted || _isStopped)
+	if (_isCounterCompleted || _isStopped){
 		return;
+	}
 
 	if (millis() - _previousMillis >= _interval) {
 
-		if (_countType == COUNT_DOWN)
-		{
-			countDown();
-		}
-		else if (_countType == COUNT_UP)
-		{
-			countUp();
-		}
-		else
-		{
-			_callback();
+		switch(_countType){
+			case COUNT_UP:
+				countUp();
+				break;
+			case COUNT_DOWN:
+				countDown();
+				break;
+			default:
+				break;		
+			
 		}
 		_previousMillis = millis();
 	}
 }
 
 
+void Countimer74HC595::start()
+{
+	_isStopped = false;
+	if(_isCounterCompleted){
+		_isCounterCompleted = false;
+	}
+}
+
+void Countimer74HC595::stop()
+{
+	_isStopped = true;
+	_isCounterCompleted = true;
+	_currentCountTime = _countTime;
+
+	if(_countType == COUNT_UP)
+	{
+		_currentCountTime = 0;		
+	}
+}
+
+void Countimer74HC595::pause()
+{
+	_isStopped = true;
+}
+
+void Countimer74HC595::restart()
+{
+	_currentCountTime = _startCountTime;
+	_isCounterCompleted = false;
+	_isStopped = false;
+
+	start();
+}
 
 
-void Countimer74HC595::setAll(uint8_t * digitalValues) {
-    int x;
-    for (x = 0 - 1; x < _numberOfShiftRegisters ; x++) {
-        shiftOut(_serialDataPin, _clockPin, MSBFIRST, digitalValues[x]);
-    }
-    _digitalValues = digitalValues; 
-    
-    digitalWrite(_latchPin, HIGH);
-    digitalWrite(_latchPin, LOW);
+uint8_t Countimer74HC595::getCurrentHours()
+{
+	return _currentCountTime / 1000 / 3600;
+}
+
+uint8_t Countimer74HC595::getCurrentMinutes()
+{
+	return _currentCountTime / 1000 % 3600 / 60;
+}
+
+uint8_t Countimer74HC595::getCurrentSeconds()
+{
+	return _currentCountTime / 1000 % 3600 % 60 % 60;
+}
+
+char* Countimer74HC595::getCurrentTime()
+{
+	sprintf(_formatted_time, "%02d:%02d:%02d", getCurrentHours(), getCurrentMinutes(), getCurrentSeconds());
+	return _formatted_time;
+}
+
+
+
+
+
+void Countimer74HC595::countUp()
+{
+	if (_currentCountTime < _countTime)
+	{
+		_currentCountTime += _interval;
+	}
+	else
+	{
+		stop();
+		if (_onComplete != NULL){
+			_onComplete();
+		}
+	}
+}
+
+
+void Countimer74HC595::countDown()
+{
+	if (_currentCountTime > 0)
+	{
+		for (int byte = 0 ; byte < _numberOfShiftRegisters; byte++){
+			shiftOut(_serialDataPin, _clockPin, MSBFIRST, _dec_digits[5]);
+		}
+		    digitalWrite(_latchPin, HIGH); 
+			digitalWrite(_latchPin, LOW); 
+			
+		_currentCountTime -= _interval;
+		
+	}
+	else
+	{
+		stop();
+		if (_onComplete != NULL){
+			_onComplete();
+		}
+	}
+}
+void printAll(){
+	
+	
+
+
 
 }
 
+
+void Countimer74HC595::setAll(uint8_t * digitalValues) {
+    int byte;
+    
+    // go through all bytes (most significant byte first)
+    for (byte = 0 ; byte < _numberOfShiftRegisters; byte++)
+        shiftOut(_serialDataPin, _clockPin, MSBFIRST, digitalValues[byte]);
+    
+    _digitalValues = digitalValues; 
+    
+    digitalWrite(_latchPin, HIGH); 
+    digitalWrite(_latchPin, LOW); 
+}
+
 void Countimer74HC595::setAllHigh() {
-    int x; 
-    for (x = 0; x < _numberOfShiftRegisters; x++)
-        _digitalValues[x] = 255;
+    int i; 
+    for (i = 0; i < _numberOfShiftRegisters; i++)
+        _digitalValues[i] = 255;
     setAll(_digitalValues); 
 }
 
 
 void Countimer74HC595::setAllLow() {
-    int x; 
-    for (x = 0; x < _numberOfShiftRegisters; x++)
-        _digitalValues[x] = 0; 
+    int i; 
+    for (i = 0; i < _numberOfShiftRegisters; i++)
+        _digitalValues[i] = 0; 
     setAll(_digitalValues); 
 }

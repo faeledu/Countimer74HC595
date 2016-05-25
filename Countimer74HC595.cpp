@@ -39,16 +39,15 @@ Countimer74HC595::Countimer74HC595(int numberOfShiftRegisters, int serialDataPin
 	setAll(_digitalValues); // reset shift register
 }
 
-void Countimer74HC595::setCounter(uint8_t hours, uint8_t minutes, uint8_t seconds, CountType countType, uint8_t interval, timer_callback onComplete)
+void Countimer74HC595::setCounter(int hours, int minutes, int seconds, CountType countType, int interval, String format, timer_callback onComplete)
 {
 	_onComplete = onComplete;
 	_countType = countType;
 	_interval = interval;
+	_format = format;
+
+	_countTime = (((hours * 3600L) + (minutes * 60L) + seconds) * 1000L);
 	
-	//_formatted_time = formatted_time;
-		
-	_countTime = (((hours * 3600) + (minutes * 60) + seconds) * 1000 );
-		
 	switch(_countType){
 		case COUNT_UP:
 			_currentCountTime = 0;
@@ -124,19 +123,19 @@ void Countimer74HC595::restart()
 }
 
 
-uint8_t Countimer74HC595::getCurrentHours()
+long Countimer74HC595::getCurrentHours()
 {
 	return _currentCountTime / 1000 / 3600;
 }
 
-uint8_t Countimer74HC595::getCurrentMinutes()
+long Countimer74HC595::getCurrentMinutes()
 {
-	return _currentCountTime / 1000 % 3600 / 60;
+	return _currentCountTime / 1000 / 60;
 }
 
-uint8_t Countimer74HC595::getCurrentSeconds()
+long Countimer74HC595::getCurrentSeconds()
 {
-	return _currentCountTime / 1000 % 3600 % 60 % 60;
+	return _currentCountTime / 1000 % 60;
 }
 
 char* Countimer74HC595::getCurrentTime()
@@ -153,6 +152,7 @@ void Countimer74HC595::countUp()
 {
 	if (_currentCountTime < _countTime)
 	{
+		sendSR();
 		_currentCountTime += _interval;
 	}
 	else
@@ -169,12 +169,7 @@ void Countimer74HC595::countDown()
 {
 	if (_currentCountTime > 0)
 	{
-		for (int byte = 0 ; byte < _numberOfShiftRegisters; byte++){
-			shiftOut(_serialDataPin, _clockPin, MSBFIRST, _dec_digits[5]);
-		}
-		    digitalWrite(_latchPin, HIGH); 
-			digitalWrite(_latchPin, LOW); 
-			
+		sendSR();
 		_currentCountTime -= _interval;
 		
 	}
@@ -186,39 +181,185 @@ void Countimer74HC595::countDown()
 		}
 	}
 }
-void printAll(){
+void Countimer74HC595::sendSR(){
+	
+	uint8_t * digitalValues;
+	
+	int cthour = 0;
+	int ctminute = 0;
+	int ctsecond = 1;
+			
+	unsigned long hour;
+	unsigned long minute;
+	unsigned long second;
+
+	for (int i = 0; i < _format.length() ; i++){
+		switch (_format[i]){
+			case 'H':
+				cthour++ ;
+				break;
+			case 'h':
+				cthour++ ;
+				break;			
+			case 'M':
+				ctminute++ ;
+				break;
+			case 'm':
+				ctminute++ ;
+				break;
+			default:
+				break;
+		}
+	}
+	
+	hour = getCurrentHours();
+	
+	int arrayHour[sizeof(hour)];
+	int number = hour;
+	for (int i = sizeof(hour); i >= 0; i--) {
+		arrayHour[i] = number % 10;
+		//Serial.print("arrayHour: ");
+		//Serial.println(arrayHour[i]);
+		number /= 10;
+	}
+	
+
+	
+		
+	
+	minute = getCurrentMinutes();
+	
+	int arrayMinute[sizeof(minute)];
+	number = minute;
+	for (int i = sizeof(minute); i >= 0; i--) {
+		arrayMinute[i] = number % 10;
+		//Serial.print("arrayMinute: ");
+		//Serial.println(arrayMinute[i]);
+		number /= 10;
+	}
+	
+	
+	
+	second = getCurrentSeconds();
+		
+	int arraySecond[sizeof(second)];
+	number = second;
+	for (int i = sizeof(second); i >= 0; i--) {
+		arraySecond[i] = number % 10;
+		//Serial.print("arraySecond: ");
+		//Serial.println(arraySecond[i]);
+		number /= 10;
+	}
+	
+	
+	/* DEBUG
+	Serial.print("_currentCountTime: ");
+	Serial.println(_currentCountTime);
+	
+	Serial.print("hour: ");
+	Serial.println(hour);
+	
+	Serial.print("minute :");
+	Serial.println(minute);
+	
+	Serial.print("second :");
+	Serial.println(second);
+	*/
+	
 	
 	
 
+	
+	for (int i = _format.length(); i > 0 ; i--){
+		
+		switch (_format[i]){
+		/*
+			case 'H':
+				if ( cthour > hour.length()){
+					digitalValues[i] = _dec_digits_dot[(hour[cthour])];
+					cthour-- ;
+				}
+				break;
+			case 'h':
+				if ( cthour > hour.length()){
+					digitalValues[i] = _dec_digits[(hour[cthour])];
+					cthour-- ;
+				}
+				break;	
 
+
+				
+			case 'M':
+			
+				if ( ctminute > minute.length() ){
+					digitalValues[i] = _dec_digits_dot[(minute[ctminute])];
+					ctminute-- ;
+				}
+				break;
+			case 'm':
+				if ( ctminute > minute.length()){
+					digitalValues[i] = _dec_digits[(minute[ctminute])];
+					ctminute-- ;
+				}
+				break;
+				
+			
+*/
+			
+			// seconds	
+			case 'S':
+				if ( ctsecond >= 0){
+					digitalValues[i] = _dec_digits_dot[arraySecond[ctsecond]];
+					ctsecond-- ;
+				} else {
+					digitalValues[i] = _dec_digits_dot[0];
+				}
+				break;
+			case 's':
+				if ( ctsecond >= 0){
+					digitalValues[i] = _dec_digits[arraySecond[ctsecond]];
+					ctsecond-- ;
+				} else {
+					digitalValues[i] = _dec_digits[0];
+				}
+				break;
+			default:
+				break;
+
+		}
+
+	}
+	
+	setAll(digitalValues);
 
 }
 
+/*
+int *
+*/
 
 void Countimer74HC595::setAll(uint8_t * digitalValues) {
     int byte;
-    
-    // go through all bytes (most significant byte first)
     for (byte = 0 ; byte < _numberOfShiftRegisters; byte++)
         shiftOut(_serialDataPin, _clockPin, MSBFIRST, digitalValues[byte]);
-    
     _digitalValues = digitalValues; 
-    
     digitalWrite(_latchPin, HIGH); 
     digitalWrite(_latchPin, LOW); 
 }
 
 void Countimer74HC595::setAllHigh() {
     int i; 
-    for (i = 0; i < _numberOfShiftRegisters; i++)
-        _digitalValues[i] = 255;
+    for (i = 0; i < _numberOfShiftRegisters; i++){
+		_digitalValues[i] = 255;
+	}
     setAll(_digitalValues); 
 }
 
 
 void Countimer74HC595::setAllLow() {
     int i; 
-    for (i = 0; i < _numberOfShiftRegisters; i++)
+    for (i = 0; i < _numberOfShiftRegisters; i++){
         _digitalValues[i] = 0; 
+	}
     setAll(_digitalValues); 
 }

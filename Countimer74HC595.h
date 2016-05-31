@@ -53,6 +53,20 @@ class Countimer74HC595
 		
     private:
 	
+		int _cthour;
+		int _ctminute;
+		int _ctsecond;
+		
+		unsigned long hour;
+		unsigned long minute;
+		unsigned long second;
+	
+	
+	
+		int * _arrayMinute;
+		int * _arrayHour;
+		int * _arraySecond;
+	
 		int _numberOfShiftRegisters;
         int _clockPin;
         int _serialDataPin;
@@ -69,7 +83,7 @@ class Countimer74HC595
 		void countUp();
 		void sendSR();
 
-		unsigned long _currentCountTime;
+		long _currentCountTime;
 		unsigned long _startCountTime;
 		unsigned long _countTime;
 
